@@ -1,0 +1,110 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Ashen Oath — Android head project.
+    - Target HANYA net9.0-android; project desktop Ashen_Oath.csproj (net9.0) TIDAK DIUBAH.
+    - Tidak ada Directory.Build.props di repo agar build desktop tidak terpengaruh.
+    - Kode game dikompilasi ulang dari ../Ashen_Oath/*.cs via glob eksplisit
+      (EnableDefaultCompileItems=false agar tidak terjadi duplikasi/default glob).
+      obj/bin parent dikecualikan; tidak ada perubahan gameplay demi CI.
+    - Binding SDL tetap ppy.SDL2-CS 1.0.82 (sama seperti desktop).
+    - Glue Java = SDL 2.32.10 resmi verbatim (org.libsdl.app) + subclass
+      com.ashenoath.game.AshenOathSDLActivity; launcher via AndroidManifest.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>AshenOath.Android</RootNamespace>
+    <AssemblyName>AshenOath.Android</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- APK: ARM64 saja (arm64-v8a). Jangan tambah x86/x86_64/armeabi-v7a. -->
+    <AndroidSupportedAbis>arm64-v8a</AndroidSupportedAbis>
+    <!-- minSdk 21 = batas bawah 64-bit Android. -->
+    <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
+
+    <ApplicationId>com.ashenoath.game</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidManifest>Properties/AndroidManifest.xml</AndroidManifest>
+
+    <!-- Tanpa keystore pribadi: .NET menandatangani APK dengan debug keystore. -->
+    <!-- Lihat docs/android-build.md untuk konsekuensi signing tahap awal. -->
+
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Kode game penuh dari project desktop (read-only reference via glob). -->
+    <Compile Include="../Ashen_Oath/*.cs" />
+    <!-- Bridge managed Android: entry [Export] + ekstraksi asset (head saja). -->
+    <Compile Include="GameEntry.cs" />
+    <Compile Include="AndroidAssetBootstrap.cs" />
+    <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Glue Java SDL 2.32.10 resmi (verbatim) + subclass launcher. -->
+    <AndroidJavaSource Include="src/main/java/org/libsdl/app/*.java" />
+    <AndroidJavaSource Include="src/main/java/com/ashenoath/game/AshenOathSDLActivity.java" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Asset game dikemas sebagai AndroidAsset; dibaca via
+         AndroidAssetBootstrap (ekstrak ke filesDir + cwd), gameplay utuh. -->
+    <AndroidAsset Include="../Ashen_Oath/Assets/**/*" Link="Assets/%(RecursiveDir)%(FileName)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Native SDL2 Android (arm64-v8a) yang VALID — lihat native/android/arm64-v8a/README.md.
+         JANGAN menaruh .so Linux/Termux di sini. Glob kosong = tidak ada yang dikemas;
+         gate CheckAndroidSdlNativeLibs di bawah menggagalkan build dengan pesan jelas. -->
+    <AndroidNativeLibrary Include="native/android/arm64-v8a/*.so">
+      <Abi>arm64-v8a</Abi>
+    </AndroidNativeLibrary>
+  </ItemGroup>
+
+  <!--
+    GATE KEJUJURAN:
+    Jika .so Android yang valid belum tersedia, GAGALKAN build dengan error jelas
+    daripada menghasilkan APK palsu/rusak (tanpa/tanpa-valid SDL arm64-v8a).
+  -->
+  <Target Name="CheckAndroidSdlNativeLibs" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <_SdlArm64Dir>native/android/arm64-v8a</_SdlArm64Dir>
+      <_SdlGateMessage>
+        <![CDATA[
+ASHEN OATH ANDROID BLOCKED: native SDL2 Android (arm64-v8a) belum tersedia.
+
+File yang wajib ada (dibangun dari source resmi, ABI arm64-v8a):
+  $(_SdlArm64Dir)/libSDL2.so
+  $(_SdlArm64Dir)/libSDL2_image.so
+  $(_SdlArm64Dir)/libSDL2_mixer.so
+
+Aturan:
+  - JANGAN menyalin /data/data/com.termux/files/usr/lib/libSDL2*.so (itu library Linux/Termux).
+  - JANGAN memakai .so Linux desktop sebagai library Android.
+  - JANGAN membuat stub/fake .so agar build lolos.
+
+Cara menyediakan yang valid (diringkas; detail di native/android/arm64-v8a/README.md):
+  1. Ambil source SDL sesuai line 2.32 (mis. tag release-2.32.10) + SDL_image/SDL_mixer 2.x yang cocok.
+  2. Bangun dengan Android NDK (SDL Android mensyaratkan NDK r28c+, SDK 35+) untuk ABI arm64-v8a.
+  3. Taruh hasil .so pada tiga path di atas, lalu jalankan ulang build.
+
+Pekerjaan lanjutan setelah .so tersedia: SDLActivity Java glue (org.libsdl.app) +
+bridge managed — lihat docs/android-build.md. Build sengaja berhenti di sini.
+        ]]>
+      </_SdlGateMessage>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_SdlArm64Dir)/libSDL2.so')"
+           Text="$(_SdlGateMessage)" />
+    <Error Condition="!Exists('$(_SdlArm64Dir)/libSDL2_image.so')"
+           Text="$(_SdlGateMessage)" />
+    <Error Condition="!Exists('$(_SdlArm64Dir)/libSDL2_mixer.so')"
+           Text="$(_SdlGateMessage)" />
+  </Target>
+
+</Project>

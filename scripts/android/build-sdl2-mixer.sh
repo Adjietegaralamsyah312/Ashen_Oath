@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+#
+# Bangun SDL2_mixer 2.8.2 untuk Android arm64-v8a dari source resmi upstream,
+# di-link terhadap SDL2 Android yang sudah dibangun tahap sebelumnya.
+# Dijalankan dari root repository di GitHub Actions (ubuntu-latest), SETELAH
+# scripts/android/build-sdl2.sh (yang menyediakan libSDL2.so + sdl-prefix).
+# Hasil: Ashen_Oath.Android/native/android/arm64-v8a/libSDL2_mixer.so
+# (workspace CI saja, JANGAN di-commit sebagai binary).
+#
+# Codec MINIMAL sesuai inspeksi game (SdlMixer.cs + Assets/Audio):
+#   - WAV: built-in SDL_mixer (11/11 file audio adalah .wav).
+#   - OGG Vorbis: game memanggil Mix_Init(INIT_OGG) secara eksplisit, maka
+#     decoder OGG diaktifkan via STB in-tree (tanpa library eksternal agar
+#     kontrak single-.so terjaga).
+#   - MP3/FLAC/MOD/MIDI/OPUS/dll MATI (tidak dipakai game; memperkecil APK).
+# Dependency portable memakai mekanisme vendored upstream SDL_mixer
+# (bukan system libraries Linux, bukan Termux).
+#
+# Environment yang diterima:
+#   ANDROID_NDK_HOME            (wajib)
+#   ANDROID_SDK_ROOT | ANDROID_HOME (wajib, salah satu; validasi toolchain)
+#   SDLMIX_CACHE_DIR            (opsional; default .sdl-cache di repo root)
+set -euo pipefail
+
+SDLMIXER_VERSION="2.8.2"
+SDLMIXER_URL="https://github.com/libsdl-org/SDL_mixer/releases/download/release-2.8.2/SDL2_mixer-2.8.2.tar.gz"
+OUT="Ashen_Oath.Android/native/android/arm64-v8a/libSDL2_mixer.so"
+SDL2_SO="Ashen_Oath.Android/native/android/arm64-v8a/libSDL2.so"
+SDL2_PREFIX="Ashen_Oath.Android/native/android/sdl-prefix"
+CACHE_DIR="${SDLMIX_CACHE_DIR:-.sdl-cache}"
+TARBALL="$CACHE_DIR/SDL2_mixer-2.8.2.tar.gz"
+
+log() { echo "[sdl2mixer-android] $*"; }
+fail() { echo "[sdl2mixer-android] ERROR: $*" >&2; exit 1; }
+
+# 0. Harus dijalankan dari root repository.
+[ -d "Ashen_Oath.Android" ] || fail "jalankan dari root repository (Ashen_Oath.Android tidak ditemukan)."
+
+# 1. Validasi environment + tooling.
+: "${ANDROID_NDK_HOME:?ANDROID_NDK_HOME harus di-set (direktori NDK r28c).}"
+if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -z "${ANDROID_HOME:-}" ]; then
+    fail "ANDROID_SDK_ROOT atau ANDROID_HOME harus di-set."
+fi
+TOOLCHAIN="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+[ -f "$TOOLCHAIN" ] || fail "toolchain NDK tidak ditemukan: $TOOLCHAIN"
+command -v cmake >/dev/null || fail "cmake tidak ditemukan."
+command -v ninja >/dev/null || fail "ninja tidak ditemukan."
+command -v file >/dev/null || fail "'file' tidak ditemukan."
+command -v readelf >/dev/null || fail "'readelf' tidak ditemukan."
+command -v nm >/dev/null || fail "'nm' tidak ditemukan."
+command -v tar >/dev/null || fail "'tar' tidak ditemukan."
+
+# 2. SDL2 Android prasyarat harus sudah ada (dibangun tahap sebelumnya).
+[ -s "$SDL2_SO" ] || fail "libSDL2.so Android tidak ditemukan di $SDL2_SO. Jalankan scripts/android/build-sdl2.sh terlebih dahulu."
+[ -d "$SDL2_PREFIX/include/SDL2" ] || fail "header SDL2 tidak ditemukan di $SDL2_PREFIX/include/SDL2. Jalankan scripts/android/build-sdl2.sh terlebih dahulu."
+SDL2_CMAKE_CONFIG="$(find "$SDL2_PREFIX" -name 'SDL2Config.cmake' | sort | head -n 1 || true)"
+[ -n "$SDL2_CMAKE_CONFIG" ] || fail "SDL2Config.cmake tidak ditemukan di $SDL2_PREFIX. Jalankan scripts/android/build-sdl2.sh terlebih dahulu."
+SDL2_DIR="$(dirname "$SDL2_CMAKE_CONFIG")"
+log "SDL2 Android: $SDL2_SO"
+log "SDL2_DIR: $SDL2_DIR"
+
+# 3. Download SDL2_mixer 2.8.2 (pakai cache bila sudah ada dan tidak kosong).
+mkdir -p "$CACHE_DIR"
+if [ -s "$TARBALL" ]; then
+    log "cache hit: $TARBALL ($(du -h "$TARBALL" | cut -f1))."
+else
+    log "download: $SDLMIXER_URL"
+    if command -v curl >/dev/null; then
+        curl -fsSL -o "$TARBALL" "$SDLMIXER_URL"
+    elif command -v wget >/dev/null; then
+        wget -O "$TARBALL" "$SDLMIXER_URL"
+    else
+        fail "butuh curl atau wget untuk download."
+    fi
+fi
+
+# 4. Verifikasi archive tidak kosong.
+[ -s "$TARBALL" ] || fail "download kosong/rusak: $TARBALL"
+log "tarball: $TARBALL ($(du -h "$TARBALL" | cut -f1))."
+
+# 5. Extract source (verifikasi source adalah SDL_mixer 2.8.x).
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+tar -xzf "$TARBALL" -C "$WORK"
+SRC="$WORK/SDL2_mixer-2.8.2"
+[ -d "$SRC" ] || fail "direktori source tidak ditemukan setelah extract: $SRC"
+[ -f "$SRC/CMakeLists.txt" ] || fail "CMakeLists.txt SDL_mixer tidak ditemukan di $SRC (bukan source 2.8.x?)."
+log "source: $SRC"
+
+# 6. Configure dengan CMake Android toolchain.
+#    SDL2 ditemukan via SDL2_DIR (prefix Android) — jangan sampai CMake mengambil
+#    SDL2 dari /usr/lib, /usr/local/lib, Termux, atau host Ubuntu.
+#    OGG via STB in-tree (tanpa lib eksternal); codec lain OFF.
+#    Variabel -D yang tidak dikenal versi ini hanya warning CMake.
+BUILD_DIR="$WORK/build"
+cmake -S "$SRC" -B "$BUILD_DIR" -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
+    -DANDROID_ABI=arm64-v8a \
+    -DANDROID_PLATFORM=android-21 \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH="$SDL2_PREFIX" \
+    -DSDL2_DIR="$SDL2_DIR" \
+    -DBUILD_SHARED_LIBS=ON \
+    -DSDL2MIXER_OGG=ON \
+    -DSDL2MIXER_OGG_VORBIS=STB \
+    -DSDL2MIXER_MP3=OFF \
+    -DSDL2MIXER_FLAC=OFF \
+    -DSDL2MIXER_MOD=OFF \
+    -DSDL2MIXER_MIDI=OFF \
+    -DSDL2MIXER_OPUS=OFF \
+    -DSDL2MIXER_VENDORED=ON \
+    -DSDL2MIXER_DEPS_SHARED=OFF \
+    -DSDL2MIXER_SAMPLES=OFF \
+    -DSDL2MIXER_TESTS=OFF
+log "opsi codec yang tercatat di CMakeCache:"
+grep -E 'SDL2MIXER_(OGG|MP3|FLAC|MOD|MIDI|OPUS|VENDORED)' "$BUILD_DIR/CMakeCache.txt" \
+    || log "(tidak ada opsi SDL2MIXER_* di cache — periksa nama opsi bila build gagal.)"
+grep -E 'SDL2_DIR' "$BUILD_DIR/CMakeCache.txt" || fail "SDL2_DIR tidak tercatat di CMakeCache."
+
+# 7. Build Release.
+cmake --build "$BUILD_DIR"
+
+# 8. Cari hasil libSDL2_mixer.so secara deterministik.
+SO_CANDIDATE="$(find "$BUILD_DIR" -type f -name 'libSDL2_mixer.so' | sort | head -n 1 || true)"
+[ -n "$SO_CANDIDATE" ] || fail "libSDL2_mixer.so tidak ditemukan di $BUILD_DIR."
+log "hasil build: $SO_CANDIDATE"
+
+# 9. Validasi otomatis: ELF 64-bit AArch64 shared object (gagal -> exit 1).
+validate_so() {
+    local f="$1"
+    [ -s "$f" ] || { echo "file kosong: $f" >&2; return 1; }
+    local info
+    info="$(file -b "$f")"
+    echo "$info"
+    case "$info" in
+        *ELF\ 64-bit*aarch64*) ;;
+        *) echo "bukan ELF 64-bit AArch64: $f" >&2; return 1 ;;
+    esac
+    case "$info" in
+        *shared\ object*) ;;
+        *) echo "bukan shared object: $f" >&2; return 1 ;;
+    esac
+    case "$info" in
+        *x86-64* | *x86_64* | *80386* | *32-bit* | *ARM\ EABI*)
+            echo "ABI salah (bukan arm64-v8a): $f" >&2; return 1 ;;
+    esac
+    local machine
+    machine="$(readelf -h "$f" | awk -F: '/Machine:/{print $2}')"
+    echo "Machine:$machine"
+    case "$machine" in
+        *AArch64*) ;;
+        *) echo "readelf Machine bukan AArch64: $f" >&2; return 1 ;;
+    esac
+    return 0
+}
+
+log "validasi hasil build (file/readelf -h):"
+validate_so "$SO_CANDIDATE" || fail "validasi libSDL2_mixer.so hasil build GAGAL."
+
+# 10. Simbol API yang dipakai game harus ada.
+for sym in Mix_Init Mix_OpenAudio Mix_LoadWAV Mix_LoadMUS Mix_PlayChannel Mix_PlayMusic Mix_HasMusicDecoder; do
+    nm -D "$SO_CANDIDATE" | grep -q " $sym$" \
+        || fail "simbol $sym tidak ditemukan di $SO_CANDIDATE."
+    log "simbol OK: $sym"
+done
+
+# 11. Dependency check via readelf -d: wajib referensi libSDL2 Android yang
+#     akan dipackage; hanya system libs Android (+ C++ NDK bila ada) yang boleh
+#     menemani single-.so ini. Library host/desktop = gagal.
+log "dependency (readelf -d):"
+readelf -d "$SO_CANDIDATE"
+NEEDED="$(readelf -d "$SO_CANDIDATE" | awk -F'[][]' '/NEEDED/{print $2}')"
+log "NEEDED: $NEEDED"
+echo "$NEEDED" | grep -q 'libSDL2' \
+    || fail "NEEDED tidak mereferensikan libSDL2 Android."
+echo "$NEEDED" | grep -qE '/usr/lib|/usr/local|termux|/data/data' \
+    && fail "NEEDED menunjuk library host/Termux (bukan Android target)."
+while IFS= read -r lib; do
+    [ -z "$lib" ] && continue
+    case "$lib" in
+        libSDL2.so | \
+        libc.so | libm.so | libdl.so | liblog.so | libandroid.so | \
+        libEGL.so | libGLESv1_CM.so | libGLESv2.so | libGLESv3.so | \
+        libOpenSLES.so | libz.so | libjnigraphics.so | libmediandk.so | \
+        libcamera2ndk.so | libnativewindow.so | libsync.so | libvulkan.so | \
+        libaaudio.so | libamidi.so | libc++_shared.so) ;;
+        *) fail "dependency tak dikenal/bukan system Android: $lib (kontrak single-.so dilanggar)." ;;
+    esac
+done <<< "$NEEDED"
+log "dependency OK: hanya libSDL2 + system libs Android."
+
+# 12. Salin hasil valid ke lokasi target, lalu validasi ulang.
+mkdir -p "$(dirname "$OUT")"
+cp -L "$SO_CANDIDATE" "$OUT"
+log "disalin ke: $OUT"
+log "validasi ulang file target:"
+validate_so "$OUT" || fail "validasi $OUT GAGAL."
+log "SELESAI: $OUT adalah ELF 64-bit AArch64 shared object (hasil NDK, WAV+OGG, link SDL2 Android)."

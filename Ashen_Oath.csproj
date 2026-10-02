@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- File CI Android (.github/docs/head project) tinggal di repo ini tetapi
+         BUKAN bagian build desktop: glob default SDK menyertakan semua *.cs di
+         bawah direktori project. Tidak mengubah gameplay/output desktop. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Ashen_Oath.Android/**/*;.github/**/*;docs/**/*</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
