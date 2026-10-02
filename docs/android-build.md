@@ -114,7 +114,7 @@ oleh file CI (tidak ada `Directory.Build.props`, tidak ada `.sln` baru,
 - Codec minimal sesuai inspeksi game (`SdlMixer.cs` memakai `Mix_Init(INIT_OGG)`
   + `Mix_LoadWAV`/`Mix_LoadMUS` + kontrol channel/music; 11/11 file audio
   adalah `.wav`, tanpa OGG/MP3/FLAC/MOD/MIDI): **WAV (built-in) + OGG Vorbis
-  via STB in-tree** (tanpa lib eksternal; MP3/FLAC/MOD/MIDI/OPUS OFF;
+  via STB in-tree** (tanpa lib eksternal; MP3/FLAC/MOD/MIDI/OPUS/WAVPACK OFF;
   dependency portable via vendored upstream).
 - Validasi otomatis: `file` (ELF 64-bit AArch64 shared object), `readelf -h`
   (Machine AArch64), simbol `Mix_Init`/`Mix_OpenAudio`/`Mix_LoadWAV`/

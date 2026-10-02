@@ -12,7 +12,7 @@
 #   - OGG Vorbis: game memanggil Mix_Init(INIT_OGG) secara eksplisit, maka
 #     decoder OGG diaktifkan via STB in-tree (tanpa library eksternal agar
 #     kontrak single-.so terjaga).
-#   - MP3/FLAC/MOD/MIDI/OPUS/dll MATI (tidak dipakai game; memperkecil APK).
+#   - MP3/FLAC/MOD/MIDI/OPUS/WAVPACK MATI (tidak dipakai game; memperkecil APK).
 # Dependency portable memakai mekanisme vendored upstream SDL_mixer
 # (bukan system libraries Linux, bukan Termux).
 #
@@ -97,7 +97,9 @@ log "source: $SRC"
 #    (SDL2_LIBRARY + SDL2_INCLUDE_DIR, BUKAN SDL2_DIR) — keduanya diarahkan
 #    eksplisit ke prefix Android. Jangan sampai CMake mengambil SDL2 dari
 #    /usr/lib, /usr/local/lib, Termux, atau host Ubuntu.
-#    OGG via STB in-tree (tanpa lib eksternal); codec lain OFF.
+#    OGG via STB in-tree (tanpa lib eksternal); MP3/FLAC/MOD/MIDI/OPUS/
+#    WAVPACK OFF (WavPack tidak dipakai game; external-nya submodule yang
+#    tidak ada di tarball release, sehingga harus OFF eksplisit).
 #    Variabel -D yang tidak dikenal versi ini hanya warning CMake.
 BUILD_DIR="$WORK/build"
 cmake -S "$SRC" -B "$BUILD_DIR" -G Ninja \
@@ -117,12 +119,13 @@ cmake -S "$SRC" -B "$BUILD_DIR" -G Ninja \
     -DSDL2MIXER_MOD=OFF \
     -DSDL2MIXER_MIDI=OFF \
     -DSDL2MIXER_OPUS=OFF \
+    -DSDL2MIXER_WAVPACK=OFF \
     -DSDL2MIXER_VENDORED=ON \
     -DSDL2MIXER_DEPS_SHARED=OFF \
     -DSDL2MIXER_SAMPLES=OFF \
     -DSDL2MIXER_TESTS=OFF
 log "opsi codec yang tercatat di CMakeCache:"
-grep -E 'SDL2MIXER_(OGG|MP3|FLAC|MOD|MIDI|OPUS|VENDORED)' "$BUILD_DIR/CMakeCache.txt" \
+grep -E 'SDL2MIXER_(OGG|MP3|FLAC|MOD|MIDI|OPUS|WAVPACK|VENDORED)' "$BUILD_DIR/CMakeCache.txt" \
     || log "(tidak ada opsi SDL2MIXER_* di cache — periksa nama opsi bila build gagal.)"
 log "SDL2 yang dipakai CMake (wajib dari prefix Android):"
 SDL2_LIB_USED="$(grep -E '^SDL2_LIBRARY:' "$BUILD_DIR/CMakeCache.txt" | cut -d= -f2- || true)"
