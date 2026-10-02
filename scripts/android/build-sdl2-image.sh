@@ -53,8 +53,13 @@ command -v tar >/dev/null || fail "'tar' tidak ditemukan."
 SDL2_CMAKE_CONFIG="$(find "$SDL2_PREFIX" -name 'SDL2Config.cmake' | sort | head -n 1 || true)"
 [ -n "$SDL2_CMAKE_CONFIG" ] || fail "SDL2Config.cmake tidak ditemukan di $SDL2_PREFIX. Jalankan scripts/android/build-sdl2.sh terlebih dahulu."
 SDL2_DIR="$(dirname "$SDL2_CMAKE_CONFIG")"
+SDL2_LIB="$SDL2_PREFIX/lib/libSDL2.so"
+SDL2_INC="$SDL2_PREFIX/include/SDL2"
+[ -f "$SDL2_LIB" ] || fail "libSDL2.so tidak ditemukan di $SDL2_LIB. Jalankan scripts/android/build-sdl2.sh terlebih dahulu."
 log "SDL2 Android: $SDL2_SO"
 log "SDL2_DIR: $SDL2_DIR"
+log "SDL2_LIBRARY: $SDL2_LIB"
+log "SDL2_INCLUDE_DIR: $SDL2_INC"
 
 # 3. Download SDL2_image 2.8.12 (pakai cache bila sudah ada dan tidak kosong).
 mkdir -p "$CACHE_DIR"
@@ -85,8 +90,10 @@ SRC="$WORK/SDL2_image-2.8.12"
 log "source: $SRC"
 
 # 6. Configure dengan CMake Android toolchain.
-#    SDL2 ditemukan via SDL2_DIR (prefix Android) — jangan sampai CMake mengambil
-#    SDL2 dari /usr/lib, /usr/local/lib, Termux, atau host Ubuntu.
+#    SDL_image 2.8.12 memakai modul find privat (cmake/FindPrivateSDL2.cmake)
+#    yang mencari SDL2_LIBRARY + SDL2_INCLUDE_DIR (BUKAN SDL2_DIR) — keduanya
+#    diarahkan eksplisit ke prefix Android. Jangan sampai CMake mengambil SDL2
+#    dari /usr/lib, /usr/local/lib, Termux, atau host Ubuntu.
 #    Codec minimal: PNG saja (kebutuhan game). Dependency portable via VENDORED
 #    upstream. Variabel -D yang tidak dikenal versi ini hanya warning CMake.
 BUILD_DIR="$WORK/build"
@@ -97,6 +104,8 @@ cmake -S "$SRC" -B "$BUILD_DIR" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH="$SDL2_PREFIX" \
     -DSDL2_DIR="$SDL2_DIR" \
+    -DSDL2_LIBRARY="$SDL2_LIB" \
+    -DSDL2_INCLUDE_DIR="$SDL2_INC" \
     -DBUILD_SHARED_LIBS=ON \
     -DSDL2IMAGE_PNG=ON \
     -DSDL2IMAGE_JPG=OFF \
@@ -109,8 +118,21 @@ cmake -S "$SRC" -B "$BUILD_DIR" -G Ninja \
     -DSDL2IMAGE_DEPS_SHARED=OFF \
     -DSDL2IMAGE_SAMPLES=OFF \
     -DSDL2IMAGE_TESTS=OFF
-log "SDL2_DIR yang dipakai CMake:"
-grep -E 'SDL2_DIR' "$BUILD_DIR/CMakeCache.txt" || fail "SDL2_DIR tidak tercatat di CMakeCache."
+log "SDL2 yang dipakai CMake (wajib dari prefix Android):"
+SDL2_LIB_USED="$(grep -E '^SDL2_LIBRARY:' "$BUILD_DIR/CMakeCache.txt" | cut -d= -f2- || true)"
+SDL2_INC_USED="$(grep -E '^SDL2_INCLUDE_DIR:' "$BUILD_DIR/CMakeCache.txt" | cut -d= -f2- || true)"
+log "SDL2_LIBRARY=$SDL2_LIB_USED"
+log "SDL2_INCLUDE_DIR=$SDL2_INC_USED"
+[ -n "$SDL2_LIB_USED" ] || fail "SDL2_LIBRARY tidak tercatat di CMakeCache."
+[ -n "$SDL2_INC_USED" ] || fail "SDL2_INCLUDE_DIR tidak tercatat di CMakeCache."
+case "$SDL2_LIB_USED" in
+    *sdl-prefix*) ;;
+    *) fail "SDL2_LIBRARY bukan dari prefix Android: $SDL2_LIB_USED" ;;
+esac
+case "$SDL2_INC_USED" in
+    *sdl-prefix*) ;;
+    *) fail "SDL2_INCLUDE_DIR bukan dari prefix Android: $SDL2_INC_USED" ;;
+esac
 
 # 7. Build Release.
 cmake --build "$BUILD_DIR"

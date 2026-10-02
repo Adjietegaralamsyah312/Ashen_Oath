@@ -86,7 +86,7 @@ oleh file CI (tidak ada `Directory.Build.props`, tidak ada `.sln` baru,
   bukan Termux, bukan stub), via `scripts/android/build-sdl2-image.sh`.
 - Dibangun terhadap SDL2 Android tahap sebelumnya
   (`Ashen_Oath.Android/native/android/arm64-v8a/libSDL2.so` + header/config
-  dari `sdl-prefix`, ditemukan via `SDL2_DIR` — tidak pernah dari
+  dari `sdl-prefix`, ditemukan via `SDL2_LIBRARY` + `SDL2_INCLUDE_DIR` (modul find privat 2.8.x, bukan `SDL2_DIR`) — tidak pernah dari
   `/usr/lib`, `/usr/local/lib`, Termux, atau host Ubuntu).
 - Target ABI `arm64-v8a`, API 21, Release, shared.
 - Codec minimal sesuai inspeksi game (`SdlImage.cs` hanya memakai
@@ -108,7 +108,7 @@ oleh file CI (tidak ada `Directory.Build.props`, tidak ada `.sln` baru,
   via `scripts/android/build-sdl2-mixer.sh`.
 - Dibangun terhadap SDL2 Android tahap sebelumnya
   (`Ashen_Oath.Android/native/android/arm64-v8a/libSDL2.so` + header/config
-  dari `sdl-prefix`, ditemukan via `SDL2_DIR` — tidak pernah dari
+  dari `sdl-prefix`, ditemukan via `SDL2_LIBRARY` + `SDL2_INCLUDE_DIR` (modul find privat 2.8.x, bukan `SDL2_DIR`) — tidak pernah dari
   `/usr/lib`, `/usr/local/lib`, host Ubuntu, atau Termux).
 - Target ABI `arm64-v8a`, API 21, NDK r28c, Release, shared.
 - Codec minimal sesuai inspeksi game (`SdlMixer.cs` memakai `Mix_Init(INIT_OGG)`
