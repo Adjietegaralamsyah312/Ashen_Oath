@@ -29,10 +29,7 @@ jobs:
       - name: Setup Android SDK (platform 35 + build-tools + NDK r28c)
         uses: android-actions/setup-android@v4
         with:
-          packages: |
-            platforms;android-35
-            build-tools;35.0.0
-            ndk;r28c
+          packages: platforms;android-35 build-tools;35.0.0 ndk;r28c
 
       - name: Export ANDROID_SDK_ROOT + ANDROID_NDK_HOME
         run: |
