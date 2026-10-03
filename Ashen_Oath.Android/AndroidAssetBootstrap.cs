@@ -17,7 +17,9 @@ internal static class AndroidAssetBootstrap
 {
     public static string EnsureExtracted()
     {
-        var context = Android.App.Application.Context
+        // global:: wajib: di dalam namespace AshenOath, nama "Android" akan
+        // di-resolve ke AshenOath.Android (RootNamespace) bila tanpa kualifikasi.
+        var context = global::Android.App.Application.Context
             ?? throw new InvalidOperationException("Application.Context null.");
         string filesDir = context.FilesDir?.AbsolutePath
             ?? throw new InvalidOperationException("FilesDir null.");
