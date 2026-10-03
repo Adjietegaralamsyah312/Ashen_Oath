@@ -11,9 +11,14 @@
     - Binding SDL tetap ppy.SDL2-CS 1.0.82 (sama seperti desktop).
     - Glue Java = SDL 2.32.10 resmi (org.libsdl.app) + subclass
       com.ashenoath.game.AshenOathSDLActivity; launcher via AndroidManifest.
-      SATU patch disengaja: SDLAudioManager.java ditulis ulang ke loop Java 7
-      (tanpa streams/lambda) karena javac .NET gagal dengan
-      "Unable to find method metafactory" pada file upstream verbatim.
+      DUA patch disengaja (tanpa perubahan perilaku):
+      (a) SDLAudioManager.java ditulis ulang ke loop Java 7 (tanpa
+          streams/lambda) karena javac .NET gagal dengan
+          "Unable to find method metafactory" pada file upstream verbatim.
+      (b) 15 tipe package-private SDL dipindah ke file publik sendiri
+          (satu publik per file, syarat javac) + nested helper dipublikkan,
+          karena generator binding C# .NET membutuhkan tipe publik
+          (tanpa ini: CS0234 di generated/...cs). Isi class tidak diubah.
   -->
 
   <PropertyGroup>
@@ -56,8 +61,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Glue Java SDL 2.32.10 resmi (SDLAudioManager dipatch Java 7, lihat
-         catatan header csproj) + subclass launcher. -->
+    <!-- Glue Java SDL 2.32.10 resmi (SDLAudioManager dipatch Java 7 + 15 helper
+         dipindah ke file publik sendiri; lihat catatan header csproj) +
+         subclass launcher. Glob *.java mencakup semua file split otomatis. -->
     <AndroidJavaSource Include="src/main/java/org/libsdl/app/*.java" />
     <AndroidJavaSource Include="src/main/java/com/ashenoath/game/AshenOathSDLActivity.java" />
   </ItemGroup>

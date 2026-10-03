@@ -22,7 +22,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.UUID;
 
-class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDevice {
+public class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDevice {
 
     private static final String TAG = "hidapi";
     private HIDDeviceManager mManager;
