@@ -82,6 +82,12 @@
     <AndroidNativeLibrary Include="native/android/arm64-v8a/*.so">
       <Abi>arm64-v8a</Abi>
     </AndroidNativeLibrary>
+    <!-- PENTING: scripts/android/build-sdl*.sh menjalankan cmake --install ke
+         native/android/sdl-prefix/ (header + .so untuk kebutuhan link antar
+         library). .NET otomatis mendeteksi .so di sana sebagai native library
+         TANPA metadata Abi -> XA4301. Exclude eksplisit agar hanya .so final
+         arm64-v8a di atas yang dikemas ke APK. -->
+    <AndroidNativeLibrary Remove="native/android/sdl-prefix/**/*.so" />
   </ItemGroup>
 
   <!--
