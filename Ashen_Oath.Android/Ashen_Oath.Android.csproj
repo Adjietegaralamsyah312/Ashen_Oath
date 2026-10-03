@@ -9,8 +9,11 @@
       Program.cs (top-level desktop) + obj/bin parent dikecualikan;
       tidak ada perubahan gameplay demi CI.
     - Binding SDL tetap ppy.SDL2-CS 1.0.82 (sama seperti desktop).
-    - Glue Java = SDL 2.32.10 resmi verbatim (org.libsdl.app) + subclass
+    - Glue Java = SDL 2.32.10 resmi (org.libsdl.app) + subclass
       com.ashenoath.game.AshenOathSDLActivity; launcher via AndroidManifest.
+      SATU patch disengaja: SDLAudioManager.java ditulis ulang ke loop Java 7
+      (tanpa streams/lambda) karena javac .NET gagal dengan
+      "Unable to find method metafactory" pada file upstream verbatim.
   -->
 
   <PropertyGroup>
@@ -53,7 +56,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Glue Java SDL 2.32.10 resmi (verbatim) + subclass launcher. -->
+    <!-- Glue Java SDL 2.32.10 resmi (SDLAudioManager dipatch Java 7, lihat
+         catatan header csproj) + subclass launcher. -->
     <AndroidJavaSource Include="src/main/java/org/libsdl/app/*.java" />
     <AndroidJavaSource Include="src/main/java/com/ashenoath/game/AshenOathSDLActivity.java" />
   </ItemGroup>
