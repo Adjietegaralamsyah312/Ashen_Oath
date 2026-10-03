@@ -5,12 +5,11 @@ using Java.Interop;
 namespace AshenOath;
 
 /// <summary>
-/// Satu-satunya entry point managed Android (pengganti pola lama
-/// MainActivity-Thread di file yang dihapus).
-/// Dipanggil dari Java AshenOathSDLActivity.ManagedMain sebagai method Java
-/// biasa <c>com.ashenoath.game.GameEntry.runGame()</c> — stub ACW resmi .NET
-/// for Android dari atribut [Export] di bawah (tanpa JNI manual, tanpa tebakan
-/// nama: [Register] eksplisit).
+/// Logika game loop managed Android (sumber kebenaran tunggal).
+/// Dipanggil HANYA via <see cref="GameEntryBridge.RunGame"/> (delegasi C#),
+/// yang dipanggil Java via reflection Class.forName("...GameEntryBridge").
+/// Java TIDAK BOLEH mereferensikan class ini langsung (javac berjalan sebelum
+/// ACW ada → "cannot find symbol").
 /// Berjalan di thread "SDLThread" milik SDL SETELAH gerbang kesiapan
 /// (surface + focus + resumed), sehingga SDL_Init() tidak pernah terlalu dini.
 /// Tepat satu kali (Interlocked guard); Game.Run() tetap satu-satunya loop.

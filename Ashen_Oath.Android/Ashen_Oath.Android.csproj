@@ -4,9 +4,10 @@
     Ashen Oath — Android head project.
     - Target HANYA net9.0-android; project desktop Ashen_Oath.csproj (net9.0) TIDAK DIUBAH.
     - Tidak ada Directory.Build.props di repo agar build desktop tidak terpengaruh.
-    - Kode game dikompilasi ulang dari ../Ashen_Oath/*.cs via glob eksplisit
+    - Kode game dikompilasi ulang dari ../*.cs via glob eksplisit
       (EnableDefaultCompileItems=false agar tidak terjadi duplikasi/default glob).
-      obj/bin parent dikecualikan; tidak ada perubahan gameplay demi CI.
+      Program.cs (top-level desktop) + obj/bin parent dikecualikan;
+      tidak ada perubahan gameplay demi CI.
     - Binding SDL tetap ppy.SDL2-CS 1.0.82 (sama seperti desktop).
     - Glue Java = SDL 2.32.10 resmi verbatim (org.libsdl.app) + subclass
       com.ashenoath.game.AshenOathSDLActivity; launcher via AndroidManifest.
@@ -20,8 +21,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- APK: ARM64 saja (arm64-v8a). Jangan tambah x86/x86_64/armeabi-v7a. -->
-    <AndroidSupportedAbis>arm64-v8a</AndroidSupportedAbis>
+    <!-- APK: ARM64 saja (android-arm64 = ABI arm64-v8a). -->
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
     <!-- minSdk 21 = batas bawah 64-bit Android. -->
     <SupportedOSPlatformVersion>21</SupportedOSPlatformVersion>
 
@@ -38,10 +39,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Kode game penuh dari project desktop (read-only reference via glob). -->
-    <Compile Include="../Ashen_Oath/*.cs" />
+    <!-- Kode game penuh dari project desktop (read-only reference via glob).
+         Repo root = folder desktop (Ashen_Oath.csproj + *.cs di root),
+         sehingga path yang benar adalah ../*.cs (bukan ../Ashen_Oath/*.cs).
+         Program.cs wajib dikecualikan: top-level statements desktop akan
+         menjadi Main ganda/keliru di APK (Android masuk via GameEntryBridge). -->
+    <Compile Include="../*.cs" Exclude="../Program.cs;../obj/**/*.cs;../bin/**/*.cs" />
     <!-- Bridge managed Android: entry [Export] + ekstraksi asset (head saja). -->
     <Compile Include="GameEntry.cs" />
+    <Compile Include="GameEntryBridge.cs" />
     <Compile Include="AndroidAssetBootstrap.cs" />
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
   </ItemGroup>
@@ -54,8 +60,9 @@
 
   <ItemGroup>
     <!-- Asset game dikemas sebagai AndroidAsset; dibaca via
-         AndroidAssetBootstrap (ekstrak ke filesDir + cwd), gameplay utuh. -->
-    <AndroidAsset Include="../Ashen_Oath/Assets/**/*" Link="Assets/%(RecursiveDir)%(FileName)%(Extension)" />
+         AndroidAssetBootstrap (ekstrak ke filesDir + cwd), gameplay utuh.
+         Path benar: ../Assets (repo root = desktop, bukan ../Ashen_Oath/Assets). -->
+    <AndroidAsset Include="../Assets/**/*" Link="Assets/%(RecursiveDir)%(FileName)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

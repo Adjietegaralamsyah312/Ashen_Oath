@@ -2,7 +2,6 @@ package com.ashenoath.game;
 
 import android.os.Bundle;
 import android.util.Log;
-import com.ashenoath.game.GameEntry;
 import org.libsdl.app.SDLActivity;
 
 /**
@@ -21,8 +20,13 @@ import org.libsdl.app.SDLActivity;
  *    nativeSetupJNI di onCreate, sebelum transisi apa pun).
  *  - Thread managed menunggu gerbang kesiapan yang SAMA dengan SDL
  *    (surface ready + focus + resumed) sehingga Game.Run()/SDL_Init() tidak
- *    pernah berjalan terlalu dini, lalu memanggil SATU-SATUNYA entry managed:
- *    GameEntry.runGame() (ACW [Export], tepat satu kali).
+ *    pernah berjalan terlalu dini, lalu memanggil SATU-SATUNYA entry managed
+ *    via bridge ACW GameEntryBridge (tepat satu kali).
+ *    Java TIDAK mengimpor class C# secara langsung: javac (AndroidJavaSource)
+ *    berjalan sebelum ACW dibuat, sehingga referensi langsung menyebabkan
+ *    "cannot find symbol". Pemanggilan memakai reflection Class.forName()
+ *    saat runtime, ketika ACW sudah ada di classes.dex dan runtime .NET
+ *    (aktif sejak Application.onCreate, jauh sebelum activity) sudah siap.
  *  - Game.Run() tetap satu-satunya game loop. Tidak ada loop kedua.
  */
 public class AshenOathSDLActivity extends SDLActivity {
@@ -82,8 +86,8 @@ public class AshenOathSDLActivity extends SDLActivity {
             }
 
             if (!isGone()) {
-                Log.v(TAG, "Running managed entry com.ashenoath.game.GameEntry.runGame()");
-                int exitCode = GameEntry.runGame();
+                Log.v(TAG, "Running managed entry via GameEntryBridge (reflection)");
+                int exitCode = callManagedEntry();
                 Log.v(TAG, "Finished managed entry (exit=" + exitCode + ")");
             } else {
                 Log.v(TAG, "Activity gone before managed entry; aborting");
@@ -92,6 +96,24 @@ public class AshenOathSDLActivity extends SDLActivity {
             if (AshenOathSDLActivity.mSingleton != null && !AshenOathSDLActivity.mSingleton.isFinishing()) {
                 AshenOathSDLActivity.mSDLThread = null;
                 AshenOathSDLActivity.mSingleton.finish();
+            }
+        }
+
+        /**
+         * Memanggil bridge ACW C# via reflection (BUKAN import langsung).
+         * ACW com.ashenoath.game.GameEntryBridge dibuat oleh build .NET dari
+         * [Register]+[Export]; javac tidak melihatnya, tetapi saat runtime
+         * (paska-gerbang kesiapan, runtime .NET aktif) class tersedia di
+         * classes.dex. Gagal → 99 (setara crash managed), tanpa loop kedua.
+         */
+        private static int callManagedEntry() {
+            try {
+                Class<?> bridge = Class.forName("com.ashenoath.game.GameEntryBridge");
+                Object result = bridge.getMethod("runGame").invoke(null);
+                return ((Integer) result).intValue();
+            } catch (Exception e) {
+                Log.e(TAG, "Managed bridge call failed: " + e);
+                return 99;
             }
         }
 
