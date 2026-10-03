@@ -30,7 +30,7 @@ public class SDLJoystickHandler_API16 extends SDLJoystickHandler {
         public ArrayList<InputDevice.MotionRange> axes;
         public ArrayList<InputDevice.MotionRange> hats;
     }
-    public static class RangeComparator implements Comparator<InputDevice.MotionRange> {
+    static class RangeComparator implements Comparator<InputDevice.MotionRange> {
         @Override
         public int compare(InputDevice.MotionRange arg0, InputDevice.MotionRange arg1) {
             // Some controllers, like the Moga Pro 2, return AXIS_GAS (22) for right trigger and AXIS_BRAKE (23) for left trigger - swap them so they're sorted in the right order for SDL
